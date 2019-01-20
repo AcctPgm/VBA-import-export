@@ -7,7 +7,7 @@ Option Explicit
 Const ptImport = True
 Const ptExport = False
 
-Public Sub ExportVBA()
+Public Sub ExportVBA(control As IRibbonControl)
 '
     Dim wbSource As Excel.Workbook
     Dim bExport As Boolean
@@ -31,7 +31,8 @@ Public Sub ExportVBA()
     End If
     
     ' Exit early if there are no VBA components to save
-    If wbSource.VBProject.VBComponents.Count = 0 Then
+'    If wbSource.VBProject.VBComponents.Count = 0 Then
+    If VBACount(wbSource) = 0 Then
         MsgBox "There are no VBA components in this workbook."
         Exit Sub
     End If
@@ -97,7 +98,7 @@ Public Sub ExportVBA()
     Next cmpComponent
     
     ' Inform user of items that will be exported, with warning about overwrites
-    sMsg = "Components to export:" & vbCr & vbCr
+    sMsg = "Components that will export:" & vbCr & vbCr
     If Len(sMsgForms) > 0 Then
         sMsg = sMsg & "Forms:" & vbCr & sMsgForms & vbCr
     End If
@@ -149,7 +150,7 @@ Public Sub ExportVBA()
     MsgBox "Export is completed"
 End Sub
 
-Public Sub ImportVBA()
+Public Sub ImportVBA(control As IRibbonControl)
 '
     Dim wbTarget As Workbook
     Dim objFSO As Object
@@ -158,6 +159,12 @@ Public Sub ImportVBA()
     Dim sImportPath As String
     Dim sFileName As String
     Dim cmpComponents As VBIDE.VBComponents
+    Dim Response As VbMsgBoxResult
+
+    Dim sMsg As String
+    Dim sMsgForms As String
+    Dim sMsgModules As String
+    Dim sMsgClasses As String
 
     Set wbTarget = ActiveWorkbook
     Set objFSO = CreateObject("Scripting.FileSystemObject")
@@ -186,23 +193,53 @@ Public Sub ImportVBA()
     If sImportPath = "*" Then
         Exit Sub
     ElseIf sImportPath = "*Error" Then
-        MsgBox "Import Folder doesn't exist:" & vbCr & sExportPath
+        MsgBox "Import Folder doesn't exist:" & vbCr & sImportPath
         Exit Sub
     End If
 
-' change this to creating & showing a list of components that will be imported
-    ' Inform the user if there aren't any VBA components to import from the folder
+    ' Show list of components that will be imported
+    lImportCount = 0
+    sMsgForms = ""
+    sMsgModules = ""
+    sMsgClasses = ""
+    
     For Each objFile In objFSO.GetFolder(sImportPath).Files
-        If (objFSO.GetExtensionName(objFile.Name) = "cls") Or _
-                (objFSO.GetExtensionName(objFile.Name) = "frm") Or _
-                (objFSO.GetExtensionName(objFile.Name) = "bas") Then
+        If (objFSO.GetExtensionName(objFile.Name) = "cls") Then
+            sMsgClasses = sMsgClasses & "  " & objFile.Name & vbCr
+            lImportCount = lImportCount + 1
+        End If
+        If (objFSO.GetExtensionName(objFile.Name) = "frm") Then
+            sMsgForms = sMsgForms & "  " & objFile.Name & vbCr
+            lImportCount = lImportCount + 1
+        End If
+        If (objFSO.GetExtensionName(objFile.Name) = "bas") Then
+            sMsgModules = sMsgModules & "  " & objFile.Name & vbCr
             lImportCount = lImportCount + 1
         End If
     Next objFile
     
+        ' Exit if there are no VBA components in the selected folder
     If lImportCount = 0 Then
-        MsgBox "There are no files to import from" & vbCr & _
-            vbTab & sImportPath
+        MsgBox "There are no files to import from" & vbCr & vbTab & sImportPath
+        Exit Sub
+    End If
+    
+    sMsg = "Components that will import:" & vbCr & vbCr
+    If Len(sMsgForms) > 0 Then
+        sMsg = sMsg & "Forms:" & vbCr & sMsgForms & vbCr
+    End If
+    If Len(sMsgModules) > 0 Then
+        sMsg = sMsg & "Modules:" & vbCr & sMsgModules & vbCr
+    End If
+    If Len(sMsgClasses) > 0 Then
+        sMsg = sMsg & "Classes:" & vbCr & sMsgClasses & vbCr
+    End If
+
+    Response = MsgBox(sMsg & _
+        IIf(VBACount(wbTarget) > 0, "CAUTION: Existing VBA components will be deleted!" & vbCr, "") & _
+        vbCr & "Proceed?", _
+        vbYesNoCancel + vbDefaultButton2, "Importing VBA Components")
+    If Response <> vbYes Then
         Exit Sub
     End If
 
@@ -222,6 +259,25 @@ Public Sub ImportVBA()
     
     MsgBox "Import is complete"
 End Sub
+
+Function VBACount(wb As Workbook)
+'
+    Dim cmpComponent As VBIDE.VBComponent
+    
+    VBACount = 0
+    For Each cmpComponent In wb.VBProject.VBComponents
+        Select Case cmpComponent.Type
+            Case vbext_ct_ClassModule
+                VBACount = VBACount + 1
+            Case vbext_ct_MSForm
+                VBACount = VBACount + 1
+            Case vbext_ct_StdModule
+                VBACount = VBACount + 1
+            Case vbext_ct_Document
+                ' This is a worksheet or workbook object, and won't be exported
+        End Select
+    Next cmpComponent
+End Function
 
 Function VBAProjectFolder(PathType As Boolean) As String
 ' PathType: ptImport - location for importing VBA components
