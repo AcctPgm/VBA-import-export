@@ -1,0 +1,2 @@
+# ignore temporary backups of Excel working files
+~*.x*
