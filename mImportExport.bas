@@ -10,11 +10,18 @@ Const ptExport = False
 Public Sub ExportModules()
     Dim wbSource As Excel.Workbook
     Dim bExport As Boolean
+    Dim lOverwrite As Long
     Dim objFSO As Object
     Dim sExportPath As String
     Dim sFileName As String
     Dim cmpComponent As VBIDE.VBComponent
+    Dim Response As VbMsgBoxResult
 
+    Dim sMsg As String
+    Dim sMsgForms As String
+    Dim sMsgModules As String
+    Dim sMsgClasses As String
+    
     Set wbSource = ActiveWorkbook
     
     ' Exit if there is no active workbook
@@ -35,19 +42,82 @@ Public Sub ExportModules()
         Exit Sub
     End If
     
+    ' Create a file system object
     Set objFSO = CreateObject("Scripting.FileSystemObject")
     
-    sExportPath = FolderWithVBAProjectFiles(ptExport)
-    If sExportPath = "Error" Then
+    ' Get the folder for saving the components
+    sExportPath = VBAProjectFolder(ptExport)
+    If sExportPath = "*" Then
+        Exit Sub
+    ElseIf sExportPath = "*Error" Then
         MsgBox "Export Folder doesn't exist:" & vbCr & sExportPath
         Exit Sub
     End If
     
-''' opion: offer to delete all existing code modules from the export folder
-'    On Error Resume Next
-'        Kill FolderWithVBAProjectFiles & "\*.*"
-'    On Error GoTo 0
-'
+    ' Create lists of components, including whether they already exist in the folder
+    lOverwrite = 0
+    sMsgForms = ""
+    sMsgModules = ""
+    sMsgClasses = ""
+    
+    For Each cmpComponent In wbSource.VBProject.VBComponents
+        sFileName = cmpComponent.Name
+
+        ' Add the prospective exported file name to the respective list
+        Select Case cmpComponent.Type
+            Case vbext_ct_ClassModule
+                sFileName = sFileName & ".cls"
+                If objFSO.FileExists(objFSO.BuildPath(sExportPath, sFileName)) Then
+                    sMsgClasses = sMsgClasses & "    " & "* " & sFileName & vbCr
+                    lOverwrite = lOverwrite + 1
+                Else
+                    sMsgClasses = sMsgClasses & "    " & sFileName & vbCr
+                End If
+            Case vbext_ct_MSForm
+                sFileName = sFileName & ".frm"
+                If objFSO.FileExists(objFSO.BuildPath(sExportPath, sFileName)) Then
+                    sMsgForms = sMsgForms & "    " & "* " & sFileName & vbCr
+                    lOverwrite = lOverwrite + 1
+                Else
+                    sMsgForms = sMsgForms & "    " & sFileName & vbCr
+                End If
+            Case vbext_ct_StdModule
+                sFileName = sFileName & ".bas"
+                If objFSO.FileExists(objFSO.BuildPath(sExportPath, sFileName)) Then
+                    sMsgModules = sMsgModules & "    " & "* " & sFileName & vbCr
+                    lOverwrite = lOverwrite + 1
+                Else
+                    sMsgModules = sMsgModules & "    " & sFileName & vbCr
+                End If
+            Case vbext_ct_Document
+                ' This is a worksheet or workbook object.
+                ' It won't be exported, so nothing to check
+        End Select
+    Next cmpComponent
+    
+    ' Inform user of what will be exported, with warning about overwrites
+    sMsg = "Components to export:" & vbCr & vbCr
+    If Len(sMsgForms) > 0 Then
+        sMsg = sMsg & "Forms:" & vbCr & sMsgForms & vbCr
+    End If
+    If Len(sMsgModules) > 0 Then
+        sMsg = sMsg & "Modules:" & vbCr & sMsgModules & vbCr
+    End If
+    If Len(sMsgClasses) > 0 Then
+        sMsg = sMsg & "Classes:" & vbCr & sMsgClasses & vbCr
+    End If
+    
+    If lOverwrite > 0 Then
+        sMsg = sMsg & "* " & lOverwrite & " item" & IIf(lOverwrite > 1, "s", "") & " will be overwritten" & _
+            vbCr & vbCr & "Proceed?"
+    End If
+    
+    Response = MsgBox(sMsg, vbYesNoCancel + IIf(lOverwrite > 0, vbDefaultButton2, vbDefaultButton1), "Confirm VBA Export")
+    If Response <> vbYes Then
+        Exit Sub
+    End If
+    
+    ' Save each component
     For Each cmpComponent In wbSource.VBProject.VBComponents
         bExport = True
         sFileName = cmpComponent.Name
@@ -111,7 +181,7 @@ Public Sub ImportModules()
 
     ' User-selected path where the code modules are located.
     sImportPath = FolderWithVBAProjectFiles(ptImport)
-    If sImportPath = "Error" Then
+    If sImportPath = "*Error" Then
         MsgBox "Import Folder doesn't exist"
         Exit Sub
     End If
@@ -148,9 +218,12 @@ Public Sub ImportModules()
     MsgBox "Import is complete"
 End Sub
 
-Function FolderWithVBAProjectFiles(PathType As Boolean) As String
+Function VBAProjectFolder(PathType As Boolean) As String
 ' PathType: ptImport - location for importing VBA components
 '           ptExport - location for exporting VBA components
+' Returns:  path, if a path was successfully selected
+'           * if user cancelled file dialog
+'           *Error if the selected path somehow doesn't exist
 '
     Dim WshShell As Object
     Dim fd As FileDialog
@@ -165,7 +238,7 @@ Function FolderWithVBAProjectFiles(PathType As Boolean) As String
     If Application.ActiveWorkbook.Path = "" Then
         sFilePath = WshShell.SpecialFolders("MyDocuments")
     Else
-        sFilePath = Application.ActiveWorkbook.FullName
+        sFilePath = Application.ActiveWorkbook.Path
     End If
     If Right(sFilePath, 1) <> "\" Then
         sFilePath = sFilePath & "\"
@@ -180,19 +253,25 @@ Function FolderWithVBAProjectFiles(PathType As Boolean) As String
         End If
         
         .InitialFileName = sFilePath
-        If .Show = -1 Then
+        
+        If .Show Then
             sFilePath = .SelectedItems.Item(1)
+        Else
+            sFilePath = "*"
         End If
     End With
     
-    If objFSO.FolderExists(sFilePath) = True Then
-        FolderWithVBAProjectFiles = sFilePath
+    If sFilePath = "*" Then
+        VBAProjectFolder = "*"
+    ElseIf objFSO.FolderExists(sFilePath) = True Then
+        VBAProjectFolder = sFilePath
     Else
-        FolderWithVBAProjectFiles = "Error"
+        VBAProjectFolder = "*Error"
     End If
 End Function
 
 Function DeleteVBAModulesAndUserForms(wb As Workbook)
+'
     Dim VBProj As VBIDE.VBProject
     Dim VBComp As VBIDE.VBComponent
     
