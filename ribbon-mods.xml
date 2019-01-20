@@ -1,0 +1,19 @@
+<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui">
+  <ribbon>
+    <tabs>
+
+      <tab idMso="TabDeveloper">
+        <group id="customGroup1" label="VBA Import/Export" insertAfterMso="GroupXML">
+
+          <button id="customButton1" label="Export VBA" size="large" 
+		onAction="ExportModules" image="ToDisk" />
+
+          <button id="customButton2" label="Import VBA" size="large" 
+		onAction="ImportModules" image="FromDisk" />
+
+        </group>
+      </tab>
+
+    </tabs>
+  </ribbon>
+</customUI>

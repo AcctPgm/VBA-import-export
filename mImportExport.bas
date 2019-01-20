@@ -7,7 +7,8 @@ Option Explicit
 Const ptImport = True
 Const ptExport = False
 
-Public Sub ExportModules()
+Public Sub ExportVBA()
+'
     Dim wbSource As Excel.Workbook
     Dim bExport As Boolean
     Dim lOverwrite As Long
@@ -95,7 +96,7 @@ Public Sub ExportModules()
         End Select
     Next cmpComponent
     
-    ' Inform user of what will be exported, with warning about overwrites
+    ' Inform user of items that will be exported, with warning about overwrites
     sMsg = "Components to export:" & vbCr & vbCr
     If Len(sMsgForms) > 0 Then
         sMsg = sMsg & "Forms:" & vbCr & sMsgForms & vbCr
@@ -148,7 +149,8 @@ Public Sub ExportModules()
     MsgBox "Export is completed"
 End Sub
 
-Public Sub ImportModules()
+Public Sub ImportVBA()
+'
     Dim wbTarget As Workbook
     Dim objFSO As Object
     Dim objFile As Object
@@ -180,12 +182,15 @@ Public Sub ImportModules()
     End If
 
     ' User-selected path where the code modules are located.
-    sImportPath = FolderWithVBAProjectFiles(ptImport)
-    If sImportPath = "*Error" Then
-        MsgBox "Import Folder doesn't exist"
+    sImportPath = VBAProjectFolder(ptImport)
+    If sImportPath = "*" Then
+        Exit Sub
+    ElseIf sImportPath = "*Error" Then
+        MsgBox "Import Folder doesn't exist:" & vbCr & sExportPath
         Exit Sub
     End If
 
+' change this to creating & showing a list of components that will be imported
     ' Inform the user if there aren't any VBA components to import from the folder
     For Each objFile In objFSO.GetFolder(sImportPath).Files
         If (objFSO.GetExtensionName(objFile.Name) = "cls") Or _
@@ -202,7 +207,7 @@ Public Sub ImportModules()
     End If
 
     ' Delete all modules/Userforms from the ActiveWorkbook before importing
-    Call DeleteVBAModulesAndUserForms(wbTarget)
+    Call DeleteVBA(wbTarget)
 
     ' Import all the code modules - .bas, .frm, .cls - in the specified path
     Set cmpComponents = wbTarget.VBProject.VBComponents
@@ -270,7 +275,7 @@ Function VBAProjectFolder(PathType As Boolean) As String
     End If
 End Function
 
-Function DeleteVBAModulesAndUserForms(wb As Workbook)
+Function DeleteVBA(wb As Workbook)
 '
     Dim VBProj As VBIDE.VBProject
     Dim VBComp As VBIDE.VBComponent
@@ -285,6 +290,5 @@ Function DeleteVBAModulesAndUserForms(wb As Workbook)
         End If
     Next VBComp
 End Function
-
 
 
