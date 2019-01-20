@@ -31,7 +31,6 @@ Public Sub ExportVBA(control As IRibbonControl)
     End If
     
     ' Exit early if there are no VBA components to save
-'    If wbSource.VBProject.VBComponents.Count = 0 Then
     If VBACount(wbSource) = 0 Then
         MsgBox "There are no VBA components in this workbook."
         Exit Sub
