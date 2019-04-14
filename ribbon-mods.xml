@@ -6,10 +6,10 @@
         <group id="customGroup1" label="VBA Import/Export" insertAfterMso="GroupXML">
 
           <button id="customButton1" label="Export VBA" size="large" 
-		onAction="ExportModules" image="ToDisk" />
+		onAction="ExportVBA" image="ToDisk" />
 
           <button id="customButton2" label="Import VBA" size="large" 
-		onAction="ImportModules" image="FromDisk" />
+		onAction="ImportVBA" image="FromDisk" />
 
         </group>
       </tab>
